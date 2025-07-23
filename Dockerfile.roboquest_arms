@@ -1,0 +1,29 @@
+FROM continuumio/miniconda3
+
+LABEL version="1"
+LABEL description="Roboquest arms support"
+LABEL maintainer="Bill Mania <bill@manialabs.us>"
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN ln -sf /bin/bash /bin/sh
+
+SHELL ["/bin/bash", "--login", "-c"]
+
+RUN apt-get update \
+    && apt-get upgrade -y
+RUN apt-get install -y \
+    vim
+RUN apt-get install -y cmake build-essential python-dev-is-python3 pkg-config
+
+WORKDIR /usr/src/rq_arms
+COPY lerobot lerobot
+WORKDIR /root/.cache/huggingface/lerobot/calibration/robots/so101_follower
+COPY lerobot/arm_follow.json /root/.cache/huggingface/lerobot/calibration/robots/so101_follower
+WORKDIR /usr/src/rq_arms
+
+RUN conda create -y -n rq_arms python=3.13
+RUN conda activate rq_arms ; \
+    pip install feetech-servo-sdk huggingface-hub pyserial deepdiff numpy draccus
+
+ENTRYPOINT ["/bin/bash", "--login"]
+#CMD ["/usr/src/start.sh"]
