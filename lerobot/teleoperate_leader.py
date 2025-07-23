@@ -33,7 +33,7 @@ from lerobot.common.teleoperators import (
     make_teleoperator_from_config,
 )
 from lerobot.common.utils.robot_utils import busy_wait
-from lerobot.common.utils.utils import init_logging, move_cursor_up
+from lerobot.common.utils.utils import init_logging
 from lerobot.common.utils.visualization_utils import _init_rerun
 
 from .common.teleoperators import so101_leader  # noqa: F401
@@ -78,21 +78,26 @@ def teleop_loop(
     """Loop through the teleoperation logic."""
     global client
 
-    client = setup_socket(server_address, server_port)
-
     while True:
-        loop_start = time.perf_counter()
-        action = teleop.get_action()
+        client = setup_socket(server_address, server_port)
 
-        action_data = pickle.dumps(action)
-        data_length = len(action_data)
-        client.send(data_length.to_bytes(4, byteorder='big'))
-        client.send(action_data)
+        while True:
+            loop_start = time.perf_counter()
+            action = teleop.get_action()
 
-        dt_s = time.perf_counter() - loop_start
-        busy_wait(1 / fps - dt_s)
+            action_data = pickle.dumps(action)
+            data_length = len(action_data)
+            try:
+                client.send(data_length.to_bytes(4, byteorder='big'))
+                client.send(action_data)
 
-        move_cursor_up(len(action) + 5)
+            except Exception as e:
+                logging.warning(f'Send to follower failed: {e}')
+                client.close()
+                break
+
+            dt_s = time.perf_counter() - loop_start
+            busy_wait(1 / fps - dt_s)
 
 
 @draccus.wrap()

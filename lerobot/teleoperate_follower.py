@@ -85,28 +85,41 @@ def teleop_loop(
     """Loop through the follower actions."""
     global server
 
-    print(f'Connecting to server at {server_address} on {server_port}')
-    server = setup_socket(server_address, server_port)
     while True:
-        loop_start = time.perf_counter()
+        print(f'Connecting to server at {server_address} on {server_port}')
+        server = setup_socket(server_address, server_port)
 
-        length_bytes = server.recv(4)
-        data_length = int.from_bytes(length_bytes, byteorder='big')
+        while True:
+            loop_start = time.perf_counter()
 
-        serialized_data = b''
-        while len(serialized_data) < data_length:
-            chunk = server.recv(data_length - len(serialized_data))
-            if not chunk:
-                print('Connection lost while receiving data')
-                continue
-            serialized_data += chunk
+            length_bytes = server.recv(4)
+            data_length = int.from_bytes(length_bytes, byteorder='big')
 
-        action = pickle.loads(serialized_data)
+            serialized_data = b''
+            while len(serialized_data) < data_length:
+                try:
+                    chunk = server.recv(data_length - len(serialized_data))
 
-        robot.send_action(action)
-        dt_s = time.perf_counter() - loop_start
-        if (1 / fps - dt_s) > 0:
-            time.sleep(1 / fps - dt_s)
+                except Exception:
+                    server.close()
+                    break
+
+                if not chunk:
+                    print('Connection lost while receiving data')
+                    continue
+                serialized_data += chunk
+
+            try:
+                action = pickle.loads(serialized_data)
+
+            except Exception:
+                server.close()
+                break
+
+            robot.send_action(action)
+            dt_s = time.perf_counter() - loop_start
+            if (1 / fps - dt_s) > 0:
+                time.sleep(1 / fps - dt_s)
 
 
 def teleoperate(robot_config: Robot_Config):
