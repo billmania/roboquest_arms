@@ -18,6 +18,7 @@ import pickle
 import socket
 import time
 from dataclasses import dataclass, field
+from os import environ
 from pathlib import Path
 
 from lerobot.common.robots import (
@@ -34,8 +35,8 @@ class Robot_Config:
     type: str = 'so101_follower'  # noqa: A003
     port: str = '/dev/arm_follow'
     id: str = 'arm_follow'  # noqa: A003
-    socket_ip: str = '192.168.0.10'
-    socket_port: int = 8888
+    socket_ip: str = environ['LEADER_IP']
+    socket_port: int = int(environ['LEADER_PORT'])
     calibration_dir: Path | None = Path(
         '/root/.cache/huggingface/lerobot/calibration/robots/so101_follower'
     )
