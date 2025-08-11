@@ -11,24 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Simple script to control a robot from teleoperation."""
 
-"""
-Simple script to control a robot from teleoperation.
-
-Example:
-
-```shell
-python -m lerobot.teleoperate \
-    --robot.type=so101_follower \
-    --robot.port=/dev/tty.usbmodem58760431541 \
-    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 1920, height: 1080, fps: 30}}" \
-    --robot.id=black \
-    --teleop.type=so101_leader \
-    --teleop.port=/dev/tty.usbmodem58760431551 \
-    --teleop.id=blue \
-    --display_data=true
-```
-"""
+# Example:
+#
+# python -m lerobot.teleoperate \
+#    --robot.type=so101_follower \
+#    --robot.port=/dev/tty.usbmodem58760431541 \
+#    --robot.cameras="{
+#        front: {
+#            type: opencv,
+#            index_or_path: 0,
+#            width: 1920,
+#            height: 1080,
+#            fps: 30
+#        }
+#      }" \
+#    --robot.id=black \
+#    --teleop.type=so101_leader \
+#    --teleop.port=/dev/tty.usbmodem58760431551 \
+#    --teleop.id=blue \
+#    --display_data=true
 
 import logging
 import time
@@ -36,11 +39,7 @@ from dataclasses import asdict, dataclass
 from pprint import pformat
 
 import draccus
-import numpy as np
-import rerun as rr
 
-from lerobot.common.cameras.opencv.configuration_opencv import OpenCVCameraConfig  # noqa: F401
-from lerobot.common.cameras.realsense.configuration_realsense import RealSenseCameraConfig  # noqa: F401
 from lerobot.common.robots import (  # noqa: F401
     Robot,
     RobotConfig,
@@ -58,11 +57,15 @@ from lerobot.common.utils.robot_utils import busy_wait
 from lerobot.common.utils.utils import init_logging, move_cursor_up
 from lerobot.common.utils.visualization_utils import _init_rerun
 
-from .common.teleoperators import gamepad, koch_leader, so100_leader, so101_leader  # noqa: F401
+import numpy as np
+
+import rerun as rr
 
 
 @dataclass
 class TeleoperateConfig:
+    """Hold configuration."""
+
     teleop: TeleoperatorConfig
     robot: RobotConfig
     # Limit the maximum frames per second.
@@ -73,8 +76,13 @@ class TeleoperateConfig:
 
 
 def teleop_loop(
-    teleop: Teleoperator, robot: Robot, fps: int, display_data: bool = False, duration: float | None = None
+    teleop: Teleoperator,
+    robot: Robot,
+    fps: int,
+    display_data: bool = False,
+    duration: float | None = None
 ):
+    """Run the teleoperation loop."""
     display_len = max(len(key) for key in robot.action_features)
     start = time.perf_counter()
     while True:
@@ -85,14 +93,18 @@ def teleop_loop(
             for one_observation in observations:
                 for obs, val in one_observation.items():
                     if isinstance(val, float):
-                        rr.log(f"observation_{obs}", rr.Scalar(val))
+                        rr.log(f'observation_{obs}', rr.Scalar(val))
                     elif isinstance(val, int):
-                        rr.log(f"observation_{obs}", rr.Scalar(val))
+                        rr.log(f'observation_{obs}', rr.Scalar(val))
                     elif isinstance(val, np.ndarray):
-                        rr.log(f"observation_{obs}", rr.Image(val), static=True)
+                        rr.log(
+                            f'observation_{obs}',
+                            rr.Image(val),
+                            static=True
+                        )
 #                for act, val in action.items():
 #                    if isinstance(val, float):
-#                        rr.log(f"action_{act}", rr.Scalar(val))
+#                        rr.log(f'action_{act}', rr.Scalar(val))
 
         robot.send_action(action)
         dt_s = time.perf_counter() - loop_start
@@ -100,11 +112,11 @@ def teleop_loop(
 
         loop_s = time.perf_counter() - loop_start
 
-        print("\n" + "-" * (display_len + 10))
+        print('\n' + '-' * (display_len + 10))
         print(f"{'NAME':<{display_len}} | {'NORM':>7}")
         for motor, value in action.items():
-            print(f"{motor:<{display_len}} | {value:>7.2f}")
-        print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
+            print(f'{motor:<{display_len}} | {value:>7.2f}')
+        print(f'\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)')
 
         if duration is not None and time.perf_counter() - start >= duration:
             return
@@ -114,10 +126,11 @@ def teleop_loop(
 
 @draccus.wrap()
 def teleoperate(cfg: TeleoperateConfig):
+    """Teleoperate the follower qrm."""
     init_logging()
     logging.info(pformat(asdict(cfg)))
     if cfg.display_data:
-        _init_rerun(session_name="teleoperation")
+        _init_rerun(session_name='teleoperation')
 
     teleop = make_teleoperator_from_config(cfg.teleop)
     robot = make_robot_from_config(cfg.robot)
@@ -126,7 +139,14 @@ def teleoperate(cfg: TeleoperateConfig):
     robot.connect()
 
     try:
-        teleop_loop(teleop, robot, cfg.fps, display_data=cfg.display_data, duration=cfg.teleop_time_s)
+        teleop_loop(
+            teleop,
+            robot,
+            cfg.fps,
+            display_data=cfg.display_data,
+            duration=cfg.teleop_time_s
+        )
+
     except KeyboardInterrupt:
         pass
     finally:
@@ -136,5 +156,5 @@ def teleoperate(cfg: TeleoperateConfig):
         robot.disconnect()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     teleoperate()
