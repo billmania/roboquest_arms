@@ -40,13 +40,10 @@ from pprint import pformat
 
 import draccus
 
-from lerobot.common.robots import (  # noqa: F401
+from lerobot.common.robots import (
     Robot,
     RobotConfig,
-    koch_follower,
-    make_robot_from_config,
-    so100_follower,
-    so101_follower,
+    make_robot_from_config
 )
 from lerobot.common.teleoperators import (
     Teleoperator,
@@ -102,9 +99,6 @@ def teleop_loop(
                             rr.Image(val),
                             static=True
                         )
-#                for act, val in action.items():
-#                    if isinstance(val, float):
-#                        rr.log(f'action_{act}', rr.Scalar(val))
 
         robot.send_action(action)
         dt_s = time.perf_counter() - loop_start

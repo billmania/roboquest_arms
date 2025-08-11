@@ -20,6 +20,7 @@ import socket
 import time
 from dataclasses import asdict, dataclass
 from pprint import pformat
+from select import select
 
 import draccus
 
@@ -38,6 +39,7 @@ from lerobot.common.utils.visualization_utils import _init_rerun
 
 from .common.teleoperators import so101_leader  # noqa: F401
 
+DONT_BLOCK = 0
 client = None
 
 
@@ -65,6 +67,20 @@ def setup_socket(server_address: str, server_port: int):
     print(f'Connected a client from {address}')
 
     return client
+
+
+def get_observations(client):
+    """Get the observations from the follower."""
+    length_bytes = client.recv(4)
+    data_length = int.from_bytes(length_bytes, byteorder='big')
+    serialized_data = b''
+    while len(serialized_data) < data_length:
+        chunk = client.recv(
+            data_length - len(serialized_data)
+        )
+        serialized_data += chunk
+
+    return pickle.loads(serialized_data)
 
 
 def teleop_loop(
@@ -98,6 +114,10 @@ def teleop_loop(
 
             dt_s = time.perf_counter() - loop_start
             busy_wait(1 / fps - dt_s)
+
+            observations_to_recv, _, _ = select([client], [], [], DONT_BLOCK)
+            if observations_to_recv:
+                _ = get_observations(client)
 
 
 @draccus.wrap()

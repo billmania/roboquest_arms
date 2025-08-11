@@ -20,12 +20,17 @@ import time
 from dataclasses import dataclass, field
 from os import environ
 from pathlib import Path
+from select import select
+from typing import Any
 
 from lerobot.common.robots import (
     Robot,
     RobotConfig,
     make_robot_from_config
 )
+
+
+DONT_BLOCK = 0
 
 
 @dataclass
@@ -75,6 +80,22 @@ def setup_socket(server_address: str, server_port: int):
             tries -= 1
 
 
+def send_observations(
+    server: socket.socket,
+    observations: list[dict[str, Any]]
+):
+    """Send the follower observations to the leader.
+
+    Any Exception is left to be caught by the caller.
+    """
+    observations_data = pickle.dumps(observations)
+    data_length = len(observations_data)
+    print(f'Sending {data_length} bytes of follower observations')
+
+    server.send(data_length.to_bytes(4, byteorder='big'))
+    server.send(observations_data)
+
+
 def teleop_loop(
     robot: Robot,
     fps: int,
@@ -83,7 +104,16 @@ def teleop_loop(
     server_address: str = '0.0.0.0',
     server_port: int = 8888
 ):
-    """Loop through the follower actions."""
+    """Loop through the follower actions.
+
+    Instead of using teleop.get_action() to read the command directly
+    from the leader hardware, the command is read from the network
+    socket.
+
+    The state of the follower arm is retrieved using
+    robot.get_observations() and then sent to the leader via the same
+    network socket.
+    """
     global server
 
     while True:
@@ -93,31 +123,58 @@ def teleop_loop(
         while True:
             loop_start = time.perf_counter()
 
-            length_bytes = server.recv(4)
-            data_length = int.from_bytes(length_bytes, byteorder='big')
+            #
+            # If there are actions ready to be received from the leader,
+            # received them and then send them to the arm.
+            #
+            actions_to_recv, _, _ = select([server], [], [], DONT_BLOCK)
+            if actions_to_recv:
+                length_bytes = server.recv(4)
+                data_length = int.from_bytes(length_bytes, byteorder='big')
 
-            serialized_data = b''
-            while len(serialized_data) < data_length:
+                serialized_data = b''
+                while len(serialized_data) < data_length:
+                    try:
+                        chunk = server.recv(
+                            data_length - len(serialized_data)
+                        )
+
+                    except Exception:
+                        server.close()
+                        break
+
+                    if not chunk:
+                        print('Connection lost while receiving data')
+                        continue
+                    serialized_data += chunk
+
                 try:
-                    chunk = server.recv(data_length - len(serialized_data))
+                    action = pickle.loads(serialized_data)
 
                 except Exception:
                     server.close()
                     break
 
-                if not chunk:
-                    print('Connection lost while receiving data')
-                    continue
-                serialized_data += chunk
+                robot.send_action(action)
 
-            try:
-                action = pickle.loads(serialized_data)
+            #
+            # If the leader socket is ready for sending, read the
+            # observations (state information) from the arm and then
+            # send them to the leader.
+            #
+            _, ready_to_send, _ = select([], [server], [], DONT_BLOCK)
+            if ready_to_send:
+                observations = robot.get_observations()
+                try:
+                    send_observations(
+                        server,
+                        observations
+                    )
 
-            except Exception:
-                server.close()
-                break
+                except Exception:
+                    server.close()
+                    break
 
-            robot.send_action(action)
             dt_s = time.perf_counter() - loop_start
             if (1 / fps - dt_s) > 0:
                 time.sleep(1 / fps - dt_s)

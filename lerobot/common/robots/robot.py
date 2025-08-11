@@ -152,7 +152,7 @@ class Robot(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_observation(self) -> dict[str, Any]:
+    def get_observations(self) -> dict[str, Any]:
         """
         Retrieve the current observation from the robot.
 
