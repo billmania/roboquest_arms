@@ -90,7 +90,6 @@ def send_observations(
     """
     observations_data = pickle.dumps(observations)
     data_length = len(observations_data)
-    print(f'Sending {data_length} bytes of follower observations')
 
     server.send(data_length.to_bytes(4, byteorder='big'))
     server.send(observations_data)
@@ -171,7 +170,8 @@ def teleop_loop(
                         observations
                     )
 
-                except Exception:
+                except Exception as e:
+                    print(f'Exception during send_observations: {e}')
                     server.close()
                     break
 

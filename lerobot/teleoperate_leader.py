@@ -70,7 +70,26 @@ def setup_socket(server_address: str, server_port: int):
 
 
 def get_observations(client):
-    """Get the observations from the follower."""
+    """Get the observations from the follower.
+
+    The observations data object is a list of four dictionaries:
+        - position
+        - load
+        - velocity
+        - amperage
+
+    The key in each dictionary has the format:
+        joint.type
+    where "joint" is the name from ('shoulder_pan', 'shoulder_lift',
+                                    'elbow_flex', 'wrist_flex',
+                                    'wrist_roll', 'gripper')
+    where "type" is from the set ('pos', 'load', 'velocity', 'amperage')
+
+    position is a signed float in degrees
+    load is an integer
+    velocity is a signed integer
+    amperage is an integer in milliamps
+    """
     length_bytes = client.recv(4)
     data_length = int.from_bytes(length_bytes, byteorder='big')
     serialized_data = b''
@@ -93,6 +112,8 @@ def teleop_loop(
 ):
     """Loop through the teleoperation logic."""
     global client
+    THROTTLE_COUNT = 50
+    observations_throttle = THROTTLE_COUNT
 
     while True:
         client = setup_socket(server_address, server_port)
@@ -112,12 +133,41 @@ def teleop_loop(
                 client.close()
                 break
 
-            dt_s = time.perf_counter() - loop_start
-            busy_wait(1 / fps - dt_s)
-
             observations_to_recv, _, _ = select([client], [], [], DONT_BLOCK)
             if observations_to_recv:
-                _ = get_observations(client)
+                observations = get_observations(client)
+                if observations_throttle <= 0:
+                    observations_throttle = THROTTLE_COUNT
+                    #
+                    # Assume each dictionary contains the same collection
+                    # of joints, that there are always four series of
+                    # observations, and that the series are always in the
+                    # order: (pos, load, velocity, amperage)..
+                    # Work through the observations and display the values
+                    # grouped by joint instead of by series.
+                    #
+                    print(
+                        f"{' ':13s}  "
+                        f"{'deg':^9s} "
+                        f"{'load':^6s} "
+                        f"{'vel':^5s} "
+                        f"{'mAmps':^4s}"
+                    )
+                    for joint_series in observations[0]:
+                        joint = joint_series.split('.')[0]
+                        j = joint + '.'
+                        print(
+                            f'{joint:13s}: '
+                            f"{observations[0][j+'pos']:9.3f} "
+                            f"{observations[1][j+'load']:6d} "
+                            f"{observations[2][j+'velocity']:5d} "
+                            f"{observations[3][j+'amperage']:4d} "
+                        )
+                else:
+                    observations_throttle -= 1
+
+            dt_s = time.perf_counter() - loop_start
+            busy_wait(1 / fps - dt_s)
 
 
 @draccus.wrap()
