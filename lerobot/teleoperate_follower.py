@@ -128,32 +128,29 @@ def teleop_loop(
             #
             actions_to_recv, _, _ = select([server], [], [], DONT_BLOCK)
             if actions_to_recv:
-                length_bytes = server.recv(4)
-                data_length = int.from_bytes(length_bytes, byteorder='big')
+                try:
+                    length_bytes = server.recv(4)
+                    data_length = int.from_bytes(
+                        length_bytes,
+                        byteorder='big'
+                    )
 
-                serialized_data = b''
-                while len(serialized_data) < data_length:
-                    try:
+                    serialized_data = b''
+                    while len(serialized_data) < data_length:
                         chunk = server.recv(
                             data_length - len(serialized_data)
                         )
 
-                    except Exception:
-                        server.close()
-                        break
-
-                    if not chunk:
-                        print('Connection lost while receiving data')
-                        continue
-                    serialized_data += chunk
-
-                try:
-                    action = pickle.loads(serialized_data)
+                        if not chunk:
+                            print('Connection lost while receiving data')
+                            continue
+                        serialized_data += chunk
 
                 except Exception:
                     server.close()
                     break
 
+                action = pickle.loads(serialized_data)
                 robot.send_action(action)
 
             #

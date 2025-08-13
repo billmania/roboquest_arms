@@ -34,7 +34,7 @@ from lerobot.common.teleoperators import (
     make_teleoperator_from_config,
 )
 from lerobot.common.utils.robot_utils import busy_wait
-from lerobot.common.utils.utils import init_logging
+from lerobot.common.utils.utils import init_logging, move_cursor_up
 from lerobot.common.utils.visualization_utils import _init_rerun
 
 from .common.teleoperators import so101_leader  # noqa: F401
@@ -86,9 +86,9 @@ def get_observations(client):
     where "type" is from the set ('pos', 'load', 'velocity', 'amperage')
 
     position is a signed float in degrees
-    load is an integer
-    velocity is a signed integer
-    amperage is an integer in milliamps
+    load is an integer in tenth of a percent of the voltage duty cycle
+    velocity is a signed integer in steps per second
+    amperage is an integer in 6.5 milliamp units
     """
     length_bytes = client.recv(4)
     data_length = int.from_bytes(length_bytes, byteorder='big')
@@ -112,7 +112,7 @@ def teleop_loop(
 ):
     """Loop through the teleoperation logic."""
     global client
-    THROTTLE_COUNT = 50
+    THROTTLE_COUNT = 10
     observations_throttle = THROTTLE_COUNT
 
     while True:
@@ -163,6 +163,7 @@ def teleop_loop(
                             f"{observations[2][j+'velocity']:5d} "
                             f"{observations[3][j+'amperage']:4d} "
                         )
+                    move_cursor_up(7)
                 else:
                     observations_throttle -= 1
 
