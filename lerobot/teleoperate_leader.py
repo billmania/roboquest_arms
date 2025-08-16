@@ -72,23 +72,22 @@ def setup_socket(server_address: str, server_port: int):
 def get_observations(client):
     """Get the observations from the follower.
 
-    The observations data object is a list of four dictionaries:
-        - position
+    The observations data object is a list of three dictionaries:
+        - goal position
+        - current position
         - load
-        - velocity
-        - amperage
 
     The key in each dictionary has the format:
         joint.type
     where "joint" is the name from ('shoulder_pan', 'shoulder_lift',
                                     'elbow_flex', 'wrist_flex',
                                     'wrist_roll', 'gripper')
-    where "type" is from the set ('pos', 'load', 'velocity', 'amperage')
+    where "type" is from the set ('goal', 'pos', 'load')
 
-    position is a signed float in degrees
+    positions are a signed float in degrees
     load is an integer in tenth of a percent of the voltage duty cycle
-    velocity is a signed integer in steps per second
-    amperage is an integer in 6.5 milliamp units
+         ranging from 0 to 1023. A load value from 513 to 1023 indicates
+         increasing load in the positive position angle direction.
     """
     length_bytes = client.recv(4)
     data_length = int.from_bytes(length_bytes, byteorder='big')
@@ -142,27 +141,28 @@ def teleop_loop(
                     # Assume each dictionary contains the same collection
                     # of joints, that there are always four series of
                     # observations, and that the series are always in the
-                    # order: (pos, load, velocity, amperage)..
+                    # order: (pos, load, goal).
                     # Work through the observations and display the values
                     # grouped by joint instead of by series.
                     #
                     print(
                         f"{' ':13s}  "
-                        f"{'deg':^9s} "
+                        f"{'goal':^9s} "
+                        f"{'pos':^9s} "
                         f"{'load':^6s} "
-                        f"{'vel':^5s} "
-                        f"{'mAmps':^4s}"
                     )
                     for joint_series in observations[0]:
                         joint = joint_series.split('.')[0]
                         j = joint + '.'
                         print(
                             f'{joint:13s}: '
-                            f"{observations[0][j+'pos']:9.3f} "
-                            f"{observations[1][j+'load']:6d} "
-                            f"{observations[2][j+'velocity']:5d} "
-                            f"{observations[3][j+'amperage']:4d} "
+                            f"{observations[0][j+'goal']:9.3f} "
+                            f"{observations[1][j+'pos']:9.3f} "
+                            f"{observations[2][j+'load']:6d} "
                         )
+                    #
+                    # Six joints plus a header is 7 lines.
+                    #
                     move_cursor_up(7)
                 else:
                     observations_throttle -= 1

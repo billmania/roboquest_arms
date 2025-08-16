@@ -15,7 +15,6 @@
 """Define utility functions for the SO101 follower arm."""
 
 import logging
-import time
 from functools import cached_property
 from typing import Any
 
@@ -197,11 +196,20 @@ class SO101Follower(Robot):
             print(f"'{motor}' motor id set to {self.bus.motors[motor].id}")
 
     def get_observations(self) -> list[dict[str, Any]]:
-        """Retrieve the status values from the arm."""
+        """Retrieve the status values from the arm.
+
+        Retrieve the current joint position, the load on the
+        joint, and the goal position for the joint.
+        """
         if not self.is_connected:
             raise DeviceNotConnectedError(f'{self} is not connected.')
 
-        start = time.perf_counter()
+        goal_dict = self.bus.sync_read('Goal_Position')
+        goal_dict = {
+            f'{motor}.goal': val
+            for motor, val
+            in goal_dict.items()
+        }
         position_dict = self.bus.sync_read('Present_Position')
         position_dict = {
             f'{motor}.pos': val
@@ -215,23 +223,8 @@ class SO101Follower(Robot):
             for motor, val
             in load_dict.items()
         }
-        velocity_dict = self.bus.sync_read('Present_Velocity')
-        velocity_dict = {
-            f'{motor}.velocity': val
-            for motor, val
-            in velocity_dict.items()
-        }
-        amperage_dict = self.bus.sync_read('Present_Current')
-        amperage_dict = {
-            f'{motor}.amperage': val
-            for motor, val
-            in amperage_dict.items()
-        }
 
-        dt_ms = (time.perf_counter() - start) * 1e3
-        logger.debug(f'{self} read state: {dt_ms:.1f}ms')
-
-        return (position_dict, load_dict, velocity_dict, amperage_dict)
+        return [goal_dict, position_dict, load_dict]
 
     def send_action(self, action: dict[str, Any]) -> dict[str, Any]:
         """Command arm to move to a target joint configuration.
