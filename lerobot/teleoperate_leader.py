@@ -85,9 +85,10 @@ def get_observations(client):
     where "type" is from the set ('goal', 'pos', 'load')
 
     positions are a signed float in degrees
-    load is an integer in tenth of a percent of the voltage duty cycle
-         ranging from 0 to 1023. A load value from 513 to 1023 indicates
-         increasing load in the positive position angle direction.
+    load is a signed integer in tenth of a percent of the voltage duty
+         cycle ranging from 0 to 1023, interpretable as the magnitude
+         of the force applied. The sign indicates the direction of the
+         force.
     """
     length_bytes = client.recv(4)
     data_length = int.from_bytes(length_bytes, byteorder='big')
@@ -147,18 +148,18 @@ def teleop_loop(
                     #
                     print(
                         f"{' ':13s}  "
-                        f"{'goal':^9s} "
-                        f"{'pos':^9s} "
-                        f"{'load':^6s} "
+                        f"{'goal':^6s} "
+                        f"{'pos':^6s} "
+                        f"{'load':^5s} "
                     )
                     for joint_series in observations[0]:
                         joint = joint_series.split('.')[0]
                         j = joint + '.'
                         print(
                             f'{joint:13s}: '
-                            f"{observations[0][j+'goal']:9.3f} "
-                            f"{observations[1][j+'pos']:9.3f} "
-                            f"{observations[2][j+'load']:6d} "
+                            f"{observations[0][j+'goal']:6.1f} "
+                            f"{observations[1][j+'pos']:6.1f} "
+                            f"{observations[2][j+'load']:5d} "
                         )
                     #
                     # Six joints plus a header is 7 lines.

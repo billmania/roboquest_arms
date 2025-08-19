@@ -217,12 +217,18 @@ class SO101Follower(Robot):
             in position_dict.items()
         }
 
-        load_dict = self.bus.sync_read('Present_Load')
-        load_dict = {
-            f'{motor}.load': val
-            for motor, val
-            in load_dict.items()
-        }
+        #
+        # Two facts are contained in the load values: the direction
+        # of the load and the 10 bit magnitude of the load.
+        #
+        CCW = -1
+        CW = 1
+        loads = self.bus.sync_read('Present_Load')
+        load_dict = {}
+        for motor, val in loads.items():
+            magnitude = val & 0b1111111111
+            direction = CCW if val & (1 << 10) else CW
+            load_dict[f'{motor}.load'] = magnitude * direction
 
         return [goal_dict, position_dict, load_dict]
 
